@@ -1,9 +1,12 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoviesApi.Context;
+using MoviesApi.DTOs;
 using MoviesApi.DTOs.Actor;
 using MoviesApi.Entities;
+using MoviesApi.Helpers;
 using MoviesApi.Services;
 using System.Collections.Generic;
 using System.IO;
@@ -27,27 +30,43 @@ namespace MoviesApi.Controllers
             _filesStorage = filesStorage;
         }
 
+        /// <summary>
+        /// Get the paginated list of actors
+        /// </summary>
+        /// <returns></returns>
         [HttpGet]
-        public async Task<ActionResult<List<ActorDTO>>> GetAsync()
+        public async Task<ActionResult<List<ActorDTO>>> GetAsync([FromQuery] PaginatorDTO paginatorDTO)
         {
-            var entities = await _context.Actors.ToListAsync();
+            var query = _context.Actors.AsQueryable();
+            await HttpContext.InsertPaginationParameters(query, paginatorDTO.CountPerPage);
+            var entities = await query.Paginate(paginatorDTO).ToListAsync();
             return _mapper.Map<List<ActorDTO>>(entities);
         }
 
-        [HttpGet("{id}", Name ="GetActor")]
+        /// <summary>
+        /// Get an actor details
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        [HttpGet("{id}", Name = "GetActor")]
         public async Task<ActionResult<ActorDTO>> GetAsync(int id)
         {
             var entity = await _context.Actors.FirstOrDefaultAsync(x => x.Id == id);
-            if(entity == null){ return NotFound(); }
+            if (entity == null) { return NotFound(); }
             return _mapper.Map<ActorDTO>(entity);
         }
 
+        /// <summary>
+        /// Create a new actor
+        /// </summary>
+        /// <param name="actorCreationDTO"></param>
+        /// <returns></returns>
         [HttpPost]
         public async Task<ActionResult> PostAsync([FromForm] ActorCreationDTO actorCreationDTO)
         {
             var entity = _mapper.Map<Actor>(actorCreationDTO);
 
-            if(actorCreationDTO.Photo != null)
+            if (actorCreationDTO.Photo != null)
             {
                 using (var memoryStream = new MemoryStream())
                 {
@@ -65,11 +84,17 @@ namespace MoviesApi.Controllers
             return new CreatedAtRouteResult("GetActor", new { Id = actorDTO.Id }, actorDTO);
         }
 
+        /// <summary>
+        /// Update an actor data
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="actorEditionDTO"></param>
+        /// <returns></returns>
         [HttpPut("{id}")]
         public async Task<ActionResult> PutAsync(int id, [FromForm] ActorEditionDTO actorEditionDTO)
         {
             var actorDB = await _context.Actors.FirstOrDefaultAsync(x => x.Id == id);
-            if(actorDB == null) { return NotFound(); }
+            if (actorDB == null) { return NotFound(); }
 
             actorDB = _mapper.Map(actorEditionDTO, actorDB);
 
@@ -88,6 +113,37 @@ namespace MoviesApi.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Update actor data partially
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="jsonPatch"></param>
+        /// <returns></returns>
+        [HttpPatch("{id}")]
+        public async Task<ActionResult> PatchAsync(int id, [FromBody] JsonPatchDocument<ActorPatchDTO> jsonPatch)
+        {
+            if(jsonPatch == null) { return BadRequest(); }
+            var entityDB = await _context.Actors.FirstOrDefaultAsync(x => x.Id == id);
+
+            if(entityDB == null) { return NotFound(); }
+
+            var entityDTO = _mapper.Map<ActorPatchDTO>(entityDB);
+            jsonPatch.ApplyTo(entityDTO, ModelState);
+
+            var isValidModel = TryValidateModel(entityDTO);
+            if (!isValidModel) { return BadRequest(ModelState); }
+
+            _mapper.Map(entityDTO, entityDB);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+
+        /// <summary>
+        /// Delete an actor
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteAsync(int id)
         {
