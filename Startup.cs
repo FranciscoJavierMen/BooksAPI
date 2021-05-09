@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using MoviesApi.Context;
+using MoviesApi.Services;
 
 namespace MoviesApi
 {
@@ -23,6 +24,9 @@ namespace MoviesApi
         {
 
             services.AddAutoMapper(typeof(Startup));
+
+            services.AddTransient<IFilesStorage, LocalStorage>();
+            services.AddHttpContextAccessor();
 
             //MySQL connection
             string mySqlConnectionStr = Configuration.GetConnectionString("DefaultConnection");
@@ -47,6 +51,8 @@ namespace MoviesApi
             }
 
             app.UseHttpsRedirection();
+
+            app.UseStaticFiles();
 
             app.UseRouting();
 
