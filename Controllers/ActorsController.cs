@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using MoviesApi.Context;
 using MoviesApi.DTOs.Actor;
 using MoviesApi.Entities;
+using MoviesApi.Services;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace MoviesApi.Controllers
@@ -15,11 +17,14 @@ namespace MoviesApi.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IMapper _mapper;
+        private readonly IFilesStorage _filesStorage;
+        private readonly string container = "actors";
 
-        public ActorsController(ApplicationDbContext context, IMapper mapper)
+        public ActorsController(ApplicationDbContext context, IMapper mapper, IFilesStorage filesStorage)
         {
             _context = context;
             _mapper = mapper;
+            _filesStorage = filesStorage;
         }
 
         [HttpGet]
@@ -41,6 +46,17 @@ namespace MoviesApi.Controllers
         public async Task<ActionResult> PostAsync([FromForm] ActorCreationDTO actorCreationDTO)
         {
             var entity = _mapper.Map<Actor>(actorCreationDTO);
+
+            if(actorCreationDTO.Photo != null)
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    await actorCreationDTO.Photo.CopyToAsync(memoryStream);
+                    var content = memoryStream.ToArray();
+                    var extension = Path.GetExtension(actorCreationDTO.Photo.FileName);
+                    entity.Photo = await _filesStorage.SaveFile(content, extension, container, actorCreationDTO.Photo.ContentType);
+                }
+            }
             await _context.AddAsync(entity);
             await _context.SaveChangesAsync();
 
@@ -52,10 +68,22 @@ namespace MoviesApi.Controllers
         [HttpPut("{id}")]
         public async Task<ActionResult> PutAsync(int id, [FromForm] ActorEditionDTO actorEditionDTO)
         {
-            var entity = _mapper.Map<Actor>(actorEditionDTO);
-            entity.Id = id;
+            var actorDB = await _context.Actors.FirstOrDefaultAsync(x => x.Id == id);
+            if(actorDB == null) { return NotFound(); }
 
-            _context.Entry(entity).State = EntityState.Modified;
+            actorDB = _mapper.Map(actorEditionDTO, actorDB);
+
+            if (actorEditionDTO.Photo != null)
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    await actorEditionDTO.Photo.CopyToAsync(memoryStream);
+                    var content = memoryStream.ToArray();
+                    var extension = Path.GetExtension(actorEditionDTO.Photo.FileName);
+                    actorDB.Photo = await _filesStorage.EditFile(content, extension, container, actorDB.Photo, actorEditionDTO.Photo.ContentType);
+                }
+            }
+
             await _context.SaveChangesAsync();
             return NoContent();
         }
