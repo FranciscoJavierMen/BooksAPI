@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace MoviesApi.Entities
@@ -12,5 +13,6 @@ namespace MoviesApi.Entities
         [DisplayFormat(DataFormatString = "{0:dd/MM/YYYY}", ApplyFormatInEditMode = true)]
         public DateTime Birthday { get; set; }
         public string Photo { get; set; }
+        public List<MoviesActors> MoviesActors{ get; set; }
     }
 }

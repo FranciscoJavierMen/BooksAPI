@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace MoviesApi.Entities
@@ -12,5 +13,8 @@ namespace MoviesApi.Entities
         public bool IsAvailable { get; set; }
         public DateTime ReleaseDate { get; set; }
         public string Poster { get; set; }
+        public List<MoviesActors> MoviesActors { get; set; }
+        public List<MoviesGenres> MoviesGenres { get; set; }
+
     }
 }
