@@ -9,10 +9,8 @@ using MoviesApi.DTOs.Movie;
 using MoviesApi.Entities;
 using MoviesApi.Helpers;
 using MoviesApi.Services;
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace MoviesApi.Controllers
@@ -82,11 +80,23 @@ namespace MoviesApi.Controllers
                 }
             }
 
+            AssignOrderActors(movie);
             _context.Add(movie);
             await _context.SaveChangesAsync();
             var movieDTO = _mapper.Map<MovieDTO>(movie);
 
             return new CreatedAtRouteResult("GetMovie", new { id = movieDTO.Id }, movieDTO);
+        }
+
+        private void AssignOrderActors(Movie movie)
+        {
+            if(movie.MoviesActors != null)
+            {
+                for(int i = 0; i < movie.MoviesActors.Count; i++)
+                {
+                    movie.MoviesActors[i].Order = i;
+                }
+            }
         }
 
         /// <summary>
@@ -98,7 +108,10 @@ namespace MoviesApi.Controllers
         [HttpPut("{id}")]
         public async Task<ActionResult> PutAsync(int id, [FromForm] MovieEditionDTO editionDTO)
         {
-            var movie = await _context.Movies.FirstOrDefaultAsync(x => x.Id == id);
+            var movie = await _context.Movies
+                .Include(x => x.MoviesActors)
+                .Include(x => x.MoviesGenres)
+                .FirstOrDefaultAsync(x => x.Id == id);
 
             if(movie == null) { return NotFound();  }
 
@@ -114,6 +127,7 @@ namespace MoviesApi.Controllers
                 }
             }
 
+            AssignOrderActors(movie);
             await _context.SaveChangesAsync();
             return NoContent();
         }
